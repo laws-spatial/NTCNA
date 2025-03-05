@@ -4,6 +4,7 @@ from pathlib import Path
 import geopandas as gpd
 import holoviews as hv
 import hvplot.pandas
+import pandas as pd
 import panel as pn
 import param
 from config import DEMOGRAPHIC_CODES, PLACES_CODES
@@ -90,17 +91,51 @@ class NTCNA_Dashboard(Viewer):
 
         # create bar chart
         severe_housing_bar_chart = severe_housing_data.hvplot.bar(
-            ylabel="Percentage of Population",
-            title="Severe Housing Population (%)",
+            ylabel="Population Percent (%)",
+            title="Severe Housing Problems Across Total Population",
         ).opts(axiswise=True)
 
         return severe_housing_bar_chart
 
+    @param.depends("places", "year", "demographic")
+    def poverty_level_plot(self):
+        place_name = self._get_place_name()
+        columns_renamed = {
+            f"us_pov_{self.demographic}_18": "US - Under 18",
+            f"st_pov_{self.demographic}_18": "Nebraska - Under 18",
+            f"pl_pov_{self.demographic}_18": f"{place_name} - Under 18",
+            f"us_pov_{self.demographic}_tot": "US - Total Population",
+            f"st_pov_{self.demographic}_tot": "Nebraska - Total Population",
+            f"pl_pov_{self.demographic}_tot": f"{place_name} - Total Population",
+        }
+
+        # slim down data
+        columns = self.base_columns + list(columns_renamed.keys())
+        poverty_data = self._census[columns].rename(columns=columns_renamed)
+
+        # filter data based on place and year
+        poverty_data = poverty_data.loc[
+            (poverty_data["PLACEFIPS"] == f"31{self.places}")
+            & (poverty_data["year"] == str(self.year))
+        ]
+
+        poverty_bar_chart = poverty_data.hvplot.bar(
+            ylabel="Population Percent (%)",
+            title=f"Poverty Among {self.demographic} Demographic Group",
+        ).opts(axiswise=True)
+
+        return poverty_bar_chart
+
     def __panel__(self):
         return pn.Row(
             pn.Param(self, width=300, name="Filters"),
-            self.median_age_plot,
-            self.severe_housing_plot,
+            pn.Column(
+                pn.Row(
+                    hv.DynamicMap(self.median_age_plot),
+                    hv.DynamicMap(self.severe_housing_plot),
+                ),
+                hv.DynamicMap(self.poverty_level_plot),
+            ),
         )
 
 
