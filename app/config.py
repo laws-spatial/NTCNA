@@ -16,7 +16,7 @@ DEMOGRAPHIC_CODES = {
     "White": "white",
     "Black": "black",
     "Asian": "asian",
-    "Hispanic": "hispanic",
+    "Hispanic": "his",
     "Other": "other",
     "Two or More": "mult",
     "Pacific Islander": "pacisl",
