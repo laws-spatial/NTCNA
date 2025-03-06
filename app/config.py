@@ -18,6 +18,6 @@ DEMOGRAPHIC_CODES = {
     "Asian": "asian",
     "Hispanic": "his",
     "Other": "other",
-    "Two or More": "mult",
+    "Two or More Races": "mult",
     "Pacific Islander": "pacisl",
 }

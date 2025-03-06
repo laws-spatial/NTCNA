@@ -32,8 +32,7 @@ class NTCNA_Dashboard(Viewer):
     # define widgets from params
     _census = param.DataFrame(census_data, precedence=-1)
     _chas = param.DataFrame(chas_data, precedence=-1)
-    places = param.Selector(objects=PLACES_CODES)
-
+    place = param.Selector(objects=PLACES_CODES)
     demographic = param.Selector(objects=DEMOGRAPHIC_CODES, default="total")
     year = param.Integer(default=2011, bounds=(2011, 2020))
 
@@ -41,11 +40,27 @@ class NTCNA_Dashboard(Viewer):
         super().__init__(**params)
         self.base_columns: list = ["NAME", "PLACEFIPS", "year", "entityID"]
 
-    def _get_place_name(self):
-        return [key for key, val in PLACES_CODES.items() if val == self.places][0]
+    def _get_place_name(self) -> str:
+        return [key for key, val in PLACES_CODES.items() if val == self.place][0]
 
-    @param.depends("places", "year", "demographic")
-    def median_age_plot(self):
+    def _get_demographic_name(self) -> str:
+        return [
+            key for key, val in DEMOGRAPHIC_CODES.items() if val == self.demographic
+        ][0]
+
+    def _create_title(self, demographic_name: str) -> str:
+        match demographic_name:
+            case "Total Population":
+                return f"Poverty Among The {demographic_name}"
+            case "Other":
+                return f"Poverty Among Those Of {demographic_name} Descent"
+            case "Two or More Races":
+                return f"Poverty Among Those With {demographic_name}"
+            case _:
+                return f"Poverty Among {demographic_name}s"
+
+    @param.depends("place", "year", "demographic")
+    def median_age_plot(self) -> hv.Bars:
         # set up for renaming columns to be more human readable
         place_name = self._get_place_name()
         columns_renamed = {
@@ -60,7 +75,7 @@ class NTCNA_Dashboard(Viewer):
 
         # filter data based on place and year
         median_age_data = median_age_data.loc[
-            (median_age_data["PLACEFIPS"] == f"31{self.places}")
+            (median_age_data["PLACEFIPS"] == f"31{self.place}")
             & (median_age_data["year"] == str(self.year))
         ]
         median_age_bar_chart = median_age_data.hvplot.bar(
@@ -70,8 +85,8 @@ class NTCNA_Dashboard(Viewer):
 
         return median_age_bar_chart
 
-    @param.depends("places", "year")
-    def severe_housing_plot(self):
+    @param.depends("place", "year")
+    def severe_housing_plot(self) -> hv.Bars:
         # set up for renaming columns to be more human readable
         place_name = self._get_place_name()
         columns_renamed = {
@@ -85,7 +100,7 @@ class NTCNA_Dashboard(Viewer):
         severe_housing_data = self._chas[columns].rename(columns=columns_renamed)
 
         severe_housing_data = severe_housing_data.loc[
-            (severe_housing_data["PLACEFIPS"] == f"31{self.places}")
+            (severe_housing_data["PLACEFIPS"] == f"31{self.place}")
             & (severe_housing_data["year"] == str(self.year))
         ]
 
@@ -97,34 +112,104 @@ class NTCNA_Dashboard(Viewer):
 
         return severe_housing_bar_chart
 
-    @param.depends("places", "year", "demographic")
-    def poverty_level_plot(self):
+    @param.depends("place", "year", "demographic")
+    def poverty_level_plot(self) -> hv.Bars:
         place_name = self._get_place_name()
+        # under18_columns_renamed = {
+        #     f"us_pov_{self.demographic}_18": "US - Under 18",
+        #     f"st_pov_{self.demographic}_18": "Nebraska - Under 18",
+        #     f"pl_pov_{self.demographic}_18": f"{place_name} - Under 18",
+        # }
+        # totalpop_columns_renamed = {
+        #     f"us_pov_{self.demographic}_tot": "US - Total Pop.",
+        #     f"st_pov_{self.demographic}_tot": "Nebraska - Total Pop.",
+        #     f"pl_pov_{self.demographic}_tot": f"{place_name} - Total Pop.",
+        # }
+
+        # columns_renamed = {
+        #     f"us_pov_{self.demographic}_18": "US - Under 18",
+        #     f"st_pov_{self.demographic}_18": "Nebraska - Under 18",
+        #     f"pl_pov_{self.demographic}_18": f"{place_name} - Under 18",
+        #     f"us_pov_{self.demographic}_tot": "US - Total Pop.",
+        #     f"st_pov_{self.demographic}_tot": "Nebraska - Total Pop.",
+        #     f"pl_pov_{self.demographic}_tot": f"{place_name} - Total Pop.",
+        # }
         columns_renamed = {
-            f"us_pov_{self.demographic}_18": "US - Under 18",
-            f"st_pov_{self.demographic}_18": "Nebraska - Under 18",
-            f"pl_pov_{self.demographic}_18": f"{place_name} - Under 18",
-            f"us_pov_{self.demographic}_tot": "US - Total Population",
-            f"st_pov_{self.demographic}_tot": "Nebraska - Total Population",
-            f"pl_pov_{self.demographic}_tot": f"{place_name} - Total Population",
+            f"us_pov_{self.demographic}_18": "US",
+            f"st_pov_{self.demographic}_18": "Nebraska",
+            f"pl_pov_{self.demographic}_18": f"{place_name}",
+            f"us_pov_{self.demographic}_tot": "US",
+            f"st_pov_{self.demographic}_tot": "Nebraska",
+            f"pl_pov_{self.demographic}_tot": f"{place_name}",
         }
 
-        # slim down data
+        # # slim down data
+        # columns = (
+        #     self.base_columns
+        #     + list(under18_columns_renamed.keys())
+        #     + list(totalpop_columns_renamed.keys())
+        # )
+        # under18_columns = self.base_columns + list(under18_columns_renamed.keys())
+        # totalpop_columns = self.base_columns + list(totalpop_columns_renamed.keys())
         columns = self.base_columns + list(columns_renamed.keys())
+        # poverty_data = self._census[columns]
         poverty_data = self._census[columns].rename(columns=columns_renamed)
 
         # filter data based on place and year
         poverty_data = poverty_data.loc[
-            (poverty_data["PLACEFIPS"] == f"31{self.places}")
+            (poverty_data["PLACEFIPS"] == f"31{self.place}")
             & (poverty_data["year"] == str(self.year))
         ]
 
-        poverty_bar_chart = poverty_data.hvplot.bar(
-            ylabel="Population Percent (%)",
-            title=f"Poverty Among {self.demographic} Demographic Group",
-        ).opts(axiswise=True)
+        # print(poverty_data[list(columns_renamed.keys())].T)
+        realigned_poverty_data = (
+            pd.melt(poverty_data, value_vars=list(columns_renamed.values()))
+            .assign(
+                group=[
+                    "Under 18",
+                    "Under 18",
+                    "Under 18",
+                    "Total Population",
+                    "Total Population",
+                    "Total Population",
+                ]
+            )
+            .set_index(["variable", "group"])
+            # .rename(columns_renamed, axis=0)
+            # .reset_index()
+        )
+        # under18_poverty_data = poverty_data[under18_columns].rename(
+        #     columns=under18_columns_renamed
+        # )
+        # totalpop_poverty_data = poverty_data[totalpop_columns].rename(
+        #     columns=totalpop_columns_renamed
+        # )
 
+        demographic_name = self._get_demographic_name()
+        title = self._create_title(demographic_name)
+
+        # poverty_bar_chart = poverty_data.hvplot.bar(
+        #     ylabel="Population Percent (%)",
+        #     title=title,
+        # ).opts(axiswise=False)
+
+        poverty_bar_chart = realigned_poverty_data.hvplot.bar(
+            ylabel="Population Percent (%)",
+            title=title,
+        ).opts(axiswise=False)
         return poverty_bar_chart
+        # under18_poverty_bar_chart = under18_poverty_data.hvplot.bar(
+        #     ylabel="Population Percent (%)",
+        #     # title=f"Poverty Among Demographic Groups",
+        # ).opts(axiswise=False)
+        # totalpop_poverty_bar_chart = totalpop_poverty_data.hvplot.bar(
+        #     ylabel="Population Percent (%)",
+        #     # title="Poverty Among Demographic Groups",
+        # ).opts(axiswise=False)
+
+        # return under18_poverty_bar_chart * totalpop_poverty_bar_chart  # .opts(
+        # #     shared_axes=False, title=f"Poverty Among The {demographic_name} Group"
+        # # )
 
     def __panel__(self):
         return pn.Row(
