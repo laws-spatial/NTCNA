@@ -39,6 +39,7 @@ class NTCNA_Dashboard(Viewer):
     def __init__(self, **params):
         super().__init__(**params)
         self.base_columns: list = ["NAME", "PLACEFIPS", "year", "entityID"]
+        self.plot_colors = ["#0b5394", "#666666", "#f1c232"]
 
     def _get_place_name(self) -> str:
         return [key for key, val in PLACES_CODES.items() if val == self.place][0]
@@ -81,6 +82,7 @@ class NTCNA_Dashboard(Viewer):
         median_age_bar_chart = median_age_data.hvplot.bar(
             ylabel="Years",
             title="Median Age",
+            color=self.plot_colors,
         ).opts(axiswise=True)
 
         return median_age_bar_chart
@@ -108,6 +110,7 @@ class NTCNA_Dashboard(Viewer):
         severe_housing_bar_chart = severe_housing_data.hvplot.bar(
             ylabel="Population Percent (%)",
             title="Severe Housing Problems Across Total Population",
+            color=self.plot_colors,
         ).opts(axiswise=True)
 
         return severe_housing_bar_chart
@@ -115,25 +118,8 @@ class NTCNA_Dashboard(Viewer):
     @param.depends("place", "year", "demographic")
     def poverty_level_plot(self) -> hv.Bars:
         place_name = self._get_place_name()
-        # under18_columns_renamed = {
-        #     f"us_pov_{self.demographic}_18": "US - Under 18",
-        #     f"st_pov_{self.demographic}_18": "Nebraska - Under 18",
-        #     f"pl_pov_{self.demographic}_18": f"{place_name} - Under 18",
-        # }
-        # totalpop_columns_renamed = {
-        #     f"us_pov_{self.demographic}_tot": "US - Total Pop.",
-        #     f"st_pov_{self.demographic}_tot": "Nebraska - Total Pop.",
-        #     f"pl_pov_{self.demographic}_tot": f"{place_name} - Total Pop.",
-        # }
 
-        # columns_renamed = {
-        #     f"us_pov_{self.demographic}_18": "US - Under 18",
-        #     f"st_pov_{self.demographic}_18": "Nebraska - Under 18",
-        #     f"pl_pov_{self.demographic}_18": f"{place_name} - Under 18",
-        #     f"us_pov_{self.demographic}_tot": "US - Total Pop.",
-        #     f"st_pov_{self.demographic}_tot": "Nebraska - Total Pop.",
-        #     f"pl_pov_{self.demographic}_tot": f"{place_name} - Total Pop.",
-        # }
+        # set up necessary column magic
         columns_renamed = {
             f"us_pov_{self.demographic}_18": "US",
             f"st_pov_{self.demographic}_18": "Nebraska",
@@ -143,16 +129,9 @@ class NTCNA_Dashboard(Viewer):
             f"pl_pov_{self.demographic}_tot": f"{place_name}",
         }
 
-        # # slim down data
-        # columns = (
-        #     self.base_columns
-        #     + list(under18_columns_renamed.keys())
-        #     + list(totalpop_columns_renamed.keys())
-        # )
-        # under18_columns = self.base_columns + list(under18_columns_renamed.keys())
-        # totalpop_columns = self.base_columns + list(totalpop_columns_renamed.keys())
         columns = self.base_columns + list(columns_renamed.keys())
-        # poverty_data = self._census[columns]
+
+        # read in data and rename columns
         poverty_data = self._census[columns].rename(columns=columns_renamed)
 
         # filter data based on place and year
@@ -161,55 +140,34 @@ class NTCNA_Dashboard(Viewer):
             & (poverty_data["year"] == str(self.year))
         ]
 
-        # print(poverty_data[list(columns_renamed.keys())].T)
+        # morph data into usable format for graph
         realigned_poverty_data = (
             pd.melt(poverty_data, value_vars=list(columns_renamed.values()))
-            .assign(
+            .assign(  # this used for grouping in chart
                 group=[
                     "Under 18",
-                    "Under 18",
+                    "Total Population",
                     "Under 18",
                     "Total Population",
-                    "Total Population",
+                    "Under 18",
                     "Total Population",
                 ]
             )
-            .set_index(["variable", "group"])
-            # .rename(columns_renamed, axis=0)
-            # .reset_index()
+            .set_index(["group", "variable"])  # set this multindex to graph propertly
         )
-        # under18_poverty_data = poverty_data[under18_columns].rename(
-        #     columns=under18_columns_renamed
-        # )
-        # totalpop_poverty_data = poverty_data[totalpop_columns].rename(
-        #     columns=totalpop_columns_renamed
-        # )
 
+        # create title of graph
         demographic_name = self._get_demographic_name()
         title = self._create_title(demographic_name)
 
-        # poverty_bar_chart = poverty_data.hvplot.bar(
-        #     ylabel="Population Percent (%)",
-        #     title=title,
-        # ).opts(axiswise=False)
-
+        # create chart
         poverty_bar_chart = realigned_poverty_data.hvplot.bar(
             ylabel="Population Percent (%)",
             title=title,
+            color=self.plot_colors,
         ).opts(axiswise=False)
-        return poverty_bar_chart
-        # under18_poverty_bar_chart = under18_poverty_data.hvplot.bar(
-        #     ylabel="Population Percent (%)",
-        #     # title=f"Poverty Among Demographic Groups",
-        # ).opts(axiswise=False)
-        # totalpop_poverty_bar_chart = totalpop_poverty_data.hvplot.bar(
-        #     ylabel="Population Percent (%)",
-        #     # title="Poverty Among Demographic Groups",
-        # ).opts(axiswise=False)
 
-        # return under18_poverty_bar_chart * totalpop_poverty_bar_chart  # .opts(
-        # #     shared_axes=False, title=f"Poverty Among The {demographic_name} Group"
-        # # )
+        return poverty_bar_chart
 
     def __panel__(self):
         return pn.Row(
