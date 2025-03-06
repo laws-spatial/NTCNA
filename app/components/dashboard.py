@@ -40,6 +40,7 @@ class NTCNA_Dashboard(Viewer):
         super().__init__(**params)
         self.base_columns: list = ["NAME", "PLACEFIPS", "year", "entityID"]
         self.plot_colors = ["#0b5394", "#666666", "#f1c232"]
+        self.bar_chart_defaults = dict(axiswise=False, default_tools=["save"])
 
     def _get_place_name(self) -> str:
         return [key for key, val in PLACES_CODES.items() if val == self.place][0]
@@ -83,8 +84,9 @@ class NTCNA_Dashboard(Viewer):
             ylabel="Years",
             title="Median Age",
             color=self.plot_colors,
-        ).opts(axiswise=True)
-
+            ylim=(0, 75),
+            # hover=False,
+        ).opts(axiswise=True, toolbar=None)
         return median_age_bar_chart
 
     @param.depends("place", "year")
@@ -111,7 +113,8 @@ class NTCNA_Dashboard(Viewer):
             ylabel="Population Percent (%)",
             title="Severe Housing Problems Across Total Population",
             color=self.plot_colors,
-        ).opts(axiswise=True)
+            ylim=(0, 35),
+        ).opts(axiswise=False, toolbar=None)
 
         return severe_housing_bar_chart
 
@@ -165,21 +168,20 @@ class NTCNA_Dashboard(Viewer):
             ylabel="Population Percent (%)",
             title=title,
             color=self.plot_colors,
-        ).opts(axiswise=False)
+            ylim=(0, 100),
+        ).opts(axiswise=False, toolbar=None)
 
         return poverty_bar_chart
 
+    # return panel object with widgets and plot
     def __panel__(self):
         return pn.Row(
             pn.Param(self, width=300, name="Filters"),
             pn.Column(
                 pn.Row(
-                    hv.DynamicMap(self.median_age_plot),
+                    hv.DynamicMap(self.median_age_plot).opts(),
                     hv.DynamicMap(self.severe_housing_plot),
                 ),
                 hv.DynamicMap(self.poverty_level_plot),
             ),
         )
-
-
-# return panel object with widgets and plot
