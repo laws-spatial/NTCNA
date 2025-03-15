@@ -169,9 +169,69 @@ class NTCNA_Dashboard(Viewer):
             title=title,
             color=self.plot_colors,
             ylim=(0, 100),
-        ).opts(axiswise=False, toolbar=None)
+        ).opts(axiswise=False, toolbar=None, shared_axes=False)
 
         return poverty_bar_chart
+
+    @param.depends("place", "year", "demographic")
+    def population_by_age_group_plot(self):
+        place_name = self._get_place_name()
+
+        # set up necessary column magic
+        columns_renamed = {
+            f"us_age_{self.demographic}_und18": "US",
+            f"st_age_{self.demographic}_und18": "Nebraska",
+            f"pl_age_{self.demographic}_und18": f"{place_name}",
+            f"us_age_{self.demographic}_18_64": "US",
+            f"st_age_{self.demographic}_18_64": "Nebraska",
+            f"pl_age_{self.demographic}_18_64": f"{place_name}",
+            f"us_age_{self.demographic}_ov65": "US",
+            f"st_age_{self.demographic}_ov65": "Nebraska",
+            f"pl_age_{self.demographic}_ov65": f"{place_name}",
+        }
+
+        columns = self.base_columns + list(columns_renamed.keys())
+
+        # read in data and rename columns
+        age_group_data = self._census[columns]
+        print(age_group_data)
+        age_group_data = age_group_data.rename(columns=columns_renamed)
+
+        # filter data based on place and year
+        age_group_data = age_group_data.loc[
+            (age_group_data["PLACEFIPS"] == f"31{self.place}")
+            & (age_group_data["year"] == str(self.year))
+        ]
+
+        print(age_group_data)
+        # morph data into usable format for graph
+        realigned_age_group_data = (
+            pd.melt(age_group_data, value_vars=list(columns_renamed.values()))
+            .assign(  # this used for grouping in chart
+                group=[
+                    "Under 18 y.o.",
+                    "18 to 64 y.o.",
+                    "65 y.o. and older",
+                    "Under 18 y.o",
+                    "18 to 64 y.o.",
+                    "65 y.o. and older",
+                    "Under 18 y.o",
+                    "18 to 64 y.o.",
+                    "65 y.o. and older",
+                ]
+            )
+            .set_index(["group", "variable"])  # set this multindex to graph propertly
+        )
+        print(realigned_age_group_data)
+        # create chart
+        age_group_bar_chart = realigned_age_group_data.hvplot.bar(
+            ylabel="Population Percent (%)",
+            title="Percentage of Population by Age Group",
+            color=self.plot_colors,
+            ylim=(0, 75),
+        ).opts(axiswise=False, toolbar=None, shared_axes=False)
+
+        return age_group_bar_chart
 
     # return panel object with widgets and plot
     def __panel__(self):
@@ -179,9 +239,12 @@ class NTCNA_Dashboard(Viewer):
             pn.Param(self, width=300, name="Filters"),
             pn.Column(
                 pn.Row(
-                    hv.DynamicMap(self.median_age_plot).opts(),
+                    hv.DynamicMap(self.median_age_plot),
                     hv.DynamicMap(self.severe_housing_plot),
                 ),
-                hv.DynamicMap(self.poverty_level_plot),
+                pn.Row(
+                    hv.DynamicMap(self.poverty_level_plot),
+                    hv.DynamicMap(self.population_by_age_group_plot),
+                ),
             ),
         )

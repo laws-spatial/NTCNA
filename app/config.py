@@ -14,7 +14,7 @@ DEMOGRAPHIC_CODES = {
     "Total Population": "total",
     "Native American": "nat",
     "White": "white",
-    "Black": "black",
+    "African American": "black",
     "Asian": "asian",
     "Hispanic": "his",
     "Other": "other",
